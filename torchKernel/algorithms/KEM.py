@@ -25,7 +25,7 @@ Options:
   -i <it>, --iter=<it>                                          number of iteration [default: 10] [type: int]
   --save_every=<save_every>                                     save image every <save_every> iterations [default: 1] [type: int]
   --num_subsets=<num_subsets>                                   number of subsets for HKEM initialisation [default: 8] [type: int]
-  --psf_fwhm=<psf_fwhmfrom artcertainty.utils.system import check_reserved_memory, check_pytorch_gpu, clear_pytorch_cache>                                         full width half maximum for the point spread function (PSF) [default: 0] [type: float]
+  --psf_fwhm=<psf_fwhmfrom torchKernel.utils.system import check_reserved_memory, check_pytorch_gpu, clear_pytorch_cache>                                         full width half maximum for the point spread function (PSF) [default: 0] [type: float]
   --seed=<seed>                                                 seed of the random process for reproducibility [default: 42] [type: int]
   --a_seed=<a_seed>                                             seed of the random process for aleatory uncertanties [type: int]
   --save_mem_k=<save_mem_k>                                     if 1 it will run another function for K calculation that does not save the K [default: 0] [type: int]                                                                                      
@@ -47,15 +47,15 @@ pet.AcquisitionData.set_storage_scheme("file")
 import sirf
 import sirf.STIR as pet
 msg = sirf.STIR.MessageRedirector(info=None, warn=None, errr=None)
-from artcertainty.kernel.LHK import BuildK
-from artcertainty.utils.torch_operations import tdivide, save_as, update_subset_model, make_cylindrical_mask_tensor
-from artcertainty.utils.sirf_torch import primal_op as FP
-from artcertainty.utils.sirf_torch import dual_op as BP
-from artcertainty.utils.system import create_working_dir_and_move_into
-from artcertainty.utils.from_sirf_ex import get_acquisition_model
-from artcertainty.algorithms.Algorithm import Algorithm
-from artcertainty.algorithms.Algorithm import read_simulation, get_working_dir_from_outpath
-from artcertainty.utils.system import check_reserved_memory, check_pytorch_gpu, clear_pytorch_cache
+from torchKernel.kernel.LHK import BuildK
+from torchKernel.utils.torch_operations import tdivide, save_as, update_subset_model, make_cylindrical_mask_tensor
+from torchKernel.utils.sirf_torch import primal_op as FP
+from torchKernel.utils.sirf_torch import dual_op as BP
+from torchKernel.utils.system import create_working_dir_and_move_into
+from torchKernel.utils.from_sirf_ex import get_acquisition_model
+from torchKernel.algorithms.Algorithm import Algorithm
+from torchKernel.algorithms.Algorithm import read_simulation, get_working_dir_from_outpath
+from torchKernel.utils.system import check_reserved_memory, check_pytorch_gpu, clear_pytorch_cache
 
 import numpy as np
 import time

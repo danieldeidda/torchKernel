@@ -51,17 +51,17 @@ pet.AcquisitionData.set_storage_scheme("memory")
 import sirf
 import sirf.STIR as pet
 msg = sirf.STIR.MessageRedirector(info=None, warn=None, errr=None)
-from artcertainty.kernel.LHK import kernelise_image as K, set_KOSMAPOSL
-from artcertainty.kernel.LHK import BuildK
-from artcertainty.utils.torch_operations import tdivide, save_as, update_subset_model
-from artcertainty.utils.sirf_torch import primal_op as FP
-from artcertainty.utils.sirf_torch import dual_op as BP
-from artcertainty.utils.system import create_working_dir_and_move_into
-from artcertainty.utils.sirf_modelling import get_acquisition_model
-from artcertainty.algorithms.Algorithm import Algorithm
-from artcertainty.algorithms.Algorithm import read_simulation, get_working_dir_from_outpath
-from artcertainty.utils.plots import plot_many_tensors
-from artcertainty.utils.system import check_reserved_memory, check_pytorch_gpu, clear_pytorch_cache
+from torchKernel.kernel.LHK import kernelise_image as K, set_KOSMAPOSL
+from torchKernel.kernel.LHK import BuildK
+from torchKernel.utils.torch_operations import tdivide, save_as, update_subset_model
+from torchKernel.utils.sirf_torch import primal_op as FP
+from torchKernel.utils.sirf_torch import dual_op as BP
+from torchKernel.utils.system import create_working_dir_and_move_into
+from torchKernel.utils.sirf_modelling import get_acquisition_model
+from torchKernel.algorithms.Algorithm import Algorithm
+from torchKernel.algorithms.Algorithm import read_simulation, get_working_dir_from_outpath
+from torchKernel.utils.plots import plot_many_tensors
+from torchKernel.utils.system import check_reserved_memory, check_pytorch_gpu, clear_pytorch_cache
 
 import numpy as np
 import time

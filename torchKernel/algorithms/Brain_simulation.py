@@ -35,11 +35,11 @@ pet.AcquisitionData.set_storage_scheme("file")
 
 msg = sirf.STIR.MessageRedirector(info=None, warn=None, errr=None)
 
-from artcertainty.utils.torch_operations import  add_noise, tdivide, save_as_template
-from artcertainty.utils.sirf_torch import primal_op as F
-from artcertainty.utils.sirf_torch import dual_op as B
-from artcertainty.utils.system import create_working_dir_and_move_into, install
-from artcertainty.utils.sirf_modelling import add_np_noise, crop_and_save, get_acquisition_model, get_acquisition_model_real_with_norm_and_umap
+from torchKernel.utils.torch_operations import  add_noise, tdivide, save_as_template
+from torchKernel.utils.sirf_torch import primal_op as F
+from torchKernel.utils.sirf_torch import dual_op as B
+from torchKernel.utils.system import create_working_dir_and_move_into, install
+from torchKernel.utils.sirf_modelling import add_np_noise, crop_and_save, get_acquisition_model, get_acquisition_model_real_with_norm_and_umap
 
 import brainweb
 from brainweb import volshow

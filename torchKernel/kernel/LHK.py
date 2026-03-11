@@ -14,7 +14,7 @@ import torch.nn as nn
 import math
 import gc
 import numpy as np
-from artcertainty.utils.system import check_reserved_memory, check_pytorch_gpu, clear_pytorch_cache
+from torchKernel.utils.system import check_reserved_memory, check_pytorch_gpu, clear_pytorch_cache
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
  

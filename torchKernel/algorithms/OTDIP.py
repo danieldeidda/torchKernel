@@ -43,16 +43,16 @@ pet.AcquisitionData.set_storage_scheme("file")
 import sirf
 import sirf.STIR as pet
 msg = sirf.STIR.MessageRedirector(info=None, warn=None, errr=None)
-from artcertainty.architectures.UNet import  UNet
-from artcertainty.architectures.UNet3D import  UNet as UNet3d
-from artcertainty.utils.torch_operations import tdivide, save_as, make_cylindrical_mask_tensor
-from artcertainty.utils.sirf_torch import primal_op as FP
-from artcertainty.utils.sirf_torch import dual_op as BP
-from artcertainty.utils.system import create_working_dir_and_move_into
-from artcertainty.utils.from_sirf_ex import get_acquisition_model
-from artcertainty.algorithms.Algorithm import Algorithm
-from artcertainty.algorithms.Algorithm import read_simulation, get_working_dir_from_outpath
-from artcertainty.utils.system import check_reserved_memory, check_pytorch_gpu, clear_pytorch_cache
+from torchKernel.architectures.UNet import  UNet
+from torchKernel.architectures.UNet3D import  UNet as UNet3d
+from torchKernel.utils.torch_operations import tdivide, save_as, make_cylindrical_mask_tensor
+from torchKernel.utils.sirf_torch import primal_op as FP
+from torchKernel.utils.sirf_torch import dual_op as BP
+from torchKernel.utils.system import create_working_dir_and_move_into
+from torchKernel.utils.from_sirf_ex import get_acquisition_model
+from torchKernel.algorithms.Algorithm import Algorithm
+from torchKernel.algorithms.Algorithm import read_simulation, get_working_dir_from_outpath
+from torchKernel.utils.system import check_reserved_memory, check_pytorch_gpu, clear_pytorch_cache
 
 import numpy as np
 import time
