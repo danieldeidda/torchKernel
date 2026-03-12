@@ -289,11 +289,7 @@ class BuildK(nn.Module):
 
         with torch.no_grad():
             Kw = torch.zeros((W.shape[2], W.shape[3]), device=device)
-            id=torch.tensor(range(W.shape[2]),  dtype=torch.int64, device=device).reshape(1,1,W.shape[2],1)
-
-            id= id.expand(W.shape).reshape(1,1,W.shape[2],W.shape[3],1)
-            idx= torch.cat([id, ID.reshape(1,1,W.shape[2],W.shape[3],1)],4)
-            del id
+            
             gc.collect()
             torch.cuda.empty_cache()
             ID_shape2=ID.shape[2]
@@ -310,25 +306,7 @@ class BuildK(nn.Module):
                     if (self.is_voxelised):
                         sigma=torch.std(W)
                         norm = W[0,0,i,0]-W[0,0,ID[0,0,i,:],0]
-                        # if (self.is_iterative==1): # this is the case of hybrid K
-                            
-                        #     # Kw[i, :] = torch.where(
-                        #     #     W[0, 0, i, :] != 0,
-                        #     #     -torch.square((norm / W[0, 0, i, 0]) / (math.sqrt(2) * ksigma)),
-                        #     #     torch.zeros_like(W[0, 0, i, :])
-                        #     #     )
-
-                        #     if W[0, 0, i, 0] != 0:
-                        #         value = -torch.square((norm / W[0, 0, i, 0].clamp(min=1e-8)) / (math.sqrt(2) * ksigma))
-                        #         Kw[i, :] = value
-                        #     else:
-                        #         continue
-
-                        #     # print(f"[Hybrid Kernel] W sum: {torch.sum(W).item()}, "
-                        #     #   f"Kw sum: {torch.sum(Kw).item()}")
-
-                        # else: 
-
+                        
                         Kw[i,:]=(-torch.square((norm/sigma)/(math.sqrt(2)*ksigma)))
                             
                     else:
@@ -337,7 +315,7 @@ class BuildK(nn.Module):
 
         Kw = torch.nn.functional.softmax(Kw, dim=1)
 
-        return Kw, idx
+        return Kw
                 
 
     def get_K_save_mem(self,W,ID,ksigma):
@@ -348,7 +326,12 @@ class BuildK(nn.Module):
     
     def get_K(self,W,ID,ksigma):
 
-        Kw, idx = self.get_features(W,ID,ksigma)
+        Kw = self.get_features(W,ID,ksigma)
+
+        id=torch.tensor(range(W.shape[2]),  dtype=torch.int64, device=device).reshape(1,1,W.shape[2],1)
+
+        id= id.expand(W.shape).reshape(1,1,W.shape[2],W.shape[3],1)
+        idx= torch.cat([id, ID.reshape(1,1,W.shape[2],W.shape[3],1)],4)
                    
         clear_pytorch_cache()
         # check_pytorch_gpu()     
@@ -392,32 +375,22 @@ class BuildK(nn.Module):
         return out.reshape(a.shape)
     
     def kernelise_image_t(self, Kw, ID, b):
-        """
-        Compute the adjoint of the kernel operator K^T b without sparse matrices.
+        # flatten
+        b_flat = b.reshape(-1)
 
-        Kw : [P, K]    weights
-        ID : [P, K]    neighbor indices
-        b  : [P]       vector being backprojected
+        # match forward reshaping
+        Kw_f = Kw.reshape(-1, Kw.shape[-1])
+        ID_f = ID.reshape(-1, ID.shape[-1]).long()
 
-        returns: [P]
-        """
+        # contribution per (j,k)
+        contrib = Kw_f * b_flat.unsqueeze(1)          # [P, K]
 
-        # 1. Expand b to match Kw (broadcasted j → j,k)
-        #    shape: [P, K]
-        b_expanded = b.unsqueeze(1).expand_as(Kw)
-
-        # 2. Compute contribution for each (j,k)
-        #    contrib[j,k] = Kw[j,k] * b[j]
-        contrib = Kw * b_expanded              # [P, K]
-
-        # 3. Scatter-add to accumulate contributions at ID[j,k]
-        #    adj[i] += contrib[j,k]  where i = ID[j,k]
-        P = Kw.shape[0]
+        # scatter-add back to original indexing
+        P = Kw_f.shape[0]
         adj = torch.zeros(P, device=Kw.device)
+        adj.scatter_add_(0, ID_f.reshape(-1), contrib.reshape(-1))
 
-        adj = adj.scatter_add(0, ID.reshape(-1), contrib.reshape(-1))
-
-        return adj
+        return adj.reshape(b.shape)    
     
     #apply kernel to image
     def kernelise_image_save_mem(self,a):
@@ -469,7 +442,7 @@ class BuildK(nn.Module):
 
         return output.reshape(org_shape)
     
-    def deepK_forward(self, net_W, k,w, functional_input=None):
+    def deepK_forward(self, input, net_W, k,w):
         ID,nN,distances = self.extract_neighbour_indices(input.shape,w)
         dim1,dim2,dim3 = net_W.shape[1], net_W.shape[2], net_W.shape[3] #(C,Jx,Jy) C = channels
         J,K = ID.shape
@@ -488,7 +461,7 @@ class BuildK(nn.Module):
         sq_diff = diff ** 2
 
         #  4. Mean over feature channels C, sqrt, and negate
-        D = -torch.sqrt(torch.mean(sq_diff, dim=2) + self.eps)   # shape: (J, K)
+        D = -torch.sqrt(torch.mean(sq_diff, dim=2) ) #+ self.eps)   # shape: (J, K)
 
         # 5. Softmax across neighbors
         Kw = torch.softmax(D, dim=1)
@@ -507,16 +480,18 @@ class BuildK(nn.Module):
         clear_pytorch_cache()
 
         if self.save_mem_k and not self.isHybrid :
+            print ("save_mem_k and not self.isHybrid")
             W, ID = self.get_knn(input,w,k)
             self.get_K_save_mem(W,ID,self.ksigma)
 
         elif self.isHybrid :
+            print (" self.isHybrid")
             # assert functional_input is None, "The input for the functional kernel is None, you need to pass it to use a hybrid kernel"
             # functional_W, _ = self.get_knn(functional_input, w, k)
             self.get_K_save_mem_STIR_like(input, w, functional_input)
 
         else:
             W, ID = self.get_knn(input,w,k)
-            return self.get_K(W,ID,self.ksigma)
+            return  self.get_features(W,ID,self.ksigma), ID #self.get_K(W,ID,self.ksigma)
 
     

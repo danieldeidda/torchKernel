@@ -18,13 +18,13 @@ pet.set_verbosity(0)
 import sirf
 import sirf.STIR as pet
 msg = sirf.STIR.MessageRedirector(info=None, warn=None, errr=None)
-from artcertainty.kernel.LHK import kernelise_image, set_KOSMAPOSL
-from artcertainty.architectures.UNet import  AttentionUNet
-from artcertainty.utils.torch_operations import tdivide, npdivide, save_as, update_subset_model
-from artcertainty.utils.sirf_torch import primal_op as FP
-from artcertainty.utils.sirf_torch import dual_op as BP
-from artcertainty.utils.system import create_working_dir_and_move_into
-from artcertainty.utils.sirf_modelling import  get_acquisition_model_real_with_norm_and_umap, get_acquisition_model
+from torchKernel.kernel.LHK import kernelise_image, set_KOSMAPOSL
+from torchKernel.architectures.UNet import  AttentionUNet
+from torchKernel.utils.torch_operations import tdivide, npdivide, save_as, update_subset_model
+from torchKernel.utils.sirf_torch import primal_op as FP
+from torchKernel.utils.sirf_torch import dual_op as BP
+from torchKernel.utils.system import create_working_dir_and_move_into
+from torchKernel.utils.sirf_modelling import  get_acquisition_model_real_with_norm_and_umap, get_acquisition_model
 
 import numpy as np
 import time
