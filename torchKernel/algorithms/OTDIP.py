@@ -148,25 +148,27 @@ class OTDIP(Algorithm):
 
                         curr_em_i=torch.nan_to_num(curr_em_i, nan=0.0, posinf=0.0, neginf=0.0) 
             
-                # if i==0:                    
-                #         scale=curr_em_i.max()
-
-            def closure():                                
-                net_out = scale*net(net_in).to(device)
-                optimiser.zero_grad()
-                #loss=mse_loss( net_out, curr_em_i)
-                tot_loss = torch.mean(sens * Poisson_loss(net_out, curr_em_i))
-                net.zero_grad()
-                tot_loss.backward()
-                data_log["loss"].append(tot_loss.item())
-                data_log['epoch'].append(len(data_log["loss"]))   
-                return tot_loss
-
             for j in range(self.deep_iter):                
-                torch.nn.utils.clip_grad_norm_(net.parameters(), max_norm=1)
-                optimiser.step(closure)      
-                with torch.no_grad():
-                    net_out = scale*net(net_in).to(device)     
+                optimiser.zero_grad() #clear old grads 
+                # Forward  
+                net_out = scale*net(net_in)
+
+                # compute loss
+                tot_loss = torch.mean(sens * Poisson_loss(net_out, curr_em_i))
+
+                # backprop
+                tot_loss.backward()
+
+                # `clip grad: always after backward() and before step()
+                torch.nn.utils.clip_grad_norm_(net.parameters(), max_norm=1) 
+
+                # update weights
+                optimiser.step() 
+                    
+                data_log["loss"].append(tot_loss.item())
+                data_log['epoch'].append(len(data_log["loss"]))       
+                # with torch.no_grad():
+                #     net_out = scale*net(net_in).to(device)     
    
             curr=net_out
 

@@ -54,8 +54,6 @@ from torchKernel.architectures.UNet3D import  UNet as UNet3d
 from torchKernel.utils.torch_operations import tdivide, save_as, make_cylindrical_mask_tensor
 from torchKernel.utils.sirf_torch import primal_op as FP
 from torchKernel.utils.sirf_torch import dual_op as BP
-from torchKernel.utils.system import create_working_dir_and_move_into
-from torchKernel.utils.from_sirf_ex import get_acquisition_model
 from torchKernel.algorithms.Algorithm import Algorithm
 from torchKernel.algorithms.Algorithm import read_simulation, get_working_dir_from_outpath
 from torchKernel.utils.system import check_reserved_memory, check_pytorch_gpu, clear_pytorch_cache
@@ -209,22 +207,29 @@ class neuralKEM(Algorithm):
                     # if i==0:                    
                     scale=alpha.max()
 
-            def closure():
-        
-                net_out = scale*net(net_in)#.to(device)
-                optimiser.zero_grad()
-                tot_loss = torch.mean(sens * Poisson_loss(net_out, curr_kem_i))
-                # net.zero_grad()
-                tot_loss.backward()
-                data_log["loss"].append(tot_loss.item())
-                data_log['epoch'].append(len(data_log["loss"]))  
-                return tot_loss
-
             for j in range(self.deep_iter): 
-                torch.nn.utils.clip_grad_norm_(net.parameters(), max_norm=1)
-                optimiser.step(closure)   
+
+                optimiser.zero_grad() #clear old grads 
+                # Forward  
+                net_out = scale*net(net_in)
+
+                # compute loss
+                tot_loss = torch.mean(sens * Poisson_loss(net_out, curr_kem_i))
+
+                # backprop
+                tot_loss.backward()
+
+                # `clip grad: always after backward() and before step()
+                torch.nn.utils.clip_grad_norm_(net.parameters(), max_norm=1) 
+
+                # update weights
+                optimiser.step() 
+                    
+                data_log["loss"].append(tot_loss.item())
+                data_log['epoch'].append(len(data_log["loss"]))    
+
                 with torch.no_grad():
-                    net_out = scale*net(net_in)#.to(device)
+                    # net_out = scale*net(net_in)#.to(device)
                     alpha_masked[mask]=net_out[mask] # alpha=torch.nan_to_num(net_out, nan=0.0, posinf=0.0, neginf=0.0)
                     alpha = alpha_masked 
 

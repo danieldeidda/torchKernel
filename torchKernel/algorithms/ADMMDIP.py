@@ -186,17 +186,36 @@ class ADMMDIP(Algorithm):
 
             if (self.optimiser_name=='ADAM'):
                 for j in range(self.deep_iter):
-                    torch.nn.utils.clip_grad_norm_(net.parameters(), max_norm=1)
-                    optimiser.step(closure)  
-                    with torch.no_grad():
-                        net_out = scale*net(net_in).to(device)                      
+                    optimiser.zero_grad() #clear old grads 
+                    # Forward  
+                    pred = scale * net(net_in)
+
+                    # Safe label: always on the same device and dtype
+                    curr_label_safe = (curr_label).to(pred.dtype).to(pred.device)
+
+                    # compute loss
+                    loss = mse_loss(pred, curr_label_safe).sum()
+
+                    # backprop
+                    loss.backward()
+
+                    # `clip grad: always after backward() and before step()
+                    torch.nn.utils.clip_grad_norm_(net.parameters(), max_norm=1) 
+
+                    # update weights
+                    optimiser.step() 
+                        
+                    data_log["loss"].append(loss.item())
+                    data_log['epoch'].append(len(data_log["loss"]))  
+                    # with torch.no_grad():
+                    #     net_out = scale*net(net_in).to(device)                      
             else:
                 loss = optimiser.step(closure)
                 data_log["loss"].append(loss.item())
                 data_log["epoch"].append(len(data_log["loss"]))
 
-                with torch.no_grad():
-                    net_out = scale * net(net_in)
+                # with torch.no_grad():
+                #     net_out = scale * net(net_in)
 
                     # torch.nn.utils.clip_grad_norm_(net.parameters(), max_norm=1)
                     # optimiser.step(closure)   
