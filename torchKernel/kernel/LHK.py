@@ -8,12 +8,13 @@ Copyright 2024 National Physical Laboratory.
 SPDX-License-Identifier: Apache-2.0
 """
 
-
 import torch
 import torch.nn as nn
 import math
 import gc
 import numpy as np
+
+import torch.nn.functional as F
 from torchKernel.utils.system import check_reserved_memory, check_pytorch_gpu, clear_pytorch_cache
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -41,7 +42,7 @@ class kernelise_image(torch.autograd.Function):
             ctx.alpha_sirf=ctx.im_template.clone().fill(cur_alpha[0,0,...])
 
         ka_np=ctx.recon.compute_kernelised_image(in_image_sirf,ctx.alpha_sirf).as_array()
-        ka=torch.from_numpy(ka_np).requires_grad_().to(device).reshape(im.shape)
+        ka=torch.from_numpy(ka_np).requires_grad_().reshape(im.shape).to(device)
     
         return ka
     
@@ -55,7 +56,7 @@ class kernelise_image(torch.autograd.Function):
             grad_sirf=ctx.im_template.fill(grad_out[0,0,...].clone().detach().cpu().numpy())
 
         kgrad_np=ctx.recon.compute_kernelised_image(grad_sirf,ctx.alpha_sirf).as_array()
-        kgrad=torch.from_numpy(kgrad_np).requires_grad_().to(device).reshape(ctx.input.shape)
+        kgrad=torch.from_numpy(kgrad_np).requires_grad_().reshape(ctx.input.shape).to(device)
 
         #out=torch.autograd.grad(ctx.ka,(a,im))
         return kgrad, None, None, None
@@ -96,10 +97,7 @@ class BuildK(nn.Module):
         self.isDeepK=isDeepK
         # STIR uses sigma_m, sigma_p, sigma_dm for anatomical, functional, and distance weighting
         self.ksigma = nn.Parameter(torch.tensor([[[[float(sigma_m)]]]], device=device))
-
-
-
-       
+   
     def extract_neighbour_indices(self,imageSize,w):
         """
         extract vector containg the indeces of the neighbourhood, w x w x w, of each voxel in an image of dimension 
@@ -113,7 +111,7 @@ class BuildK(nn.Module):
 
         
         wlen = 2*np.floor(w/2)
-        widx = xidx = yidx = torch.arange(-wlen/2,wlen/2+1)
+        widx = xidx = yidx = torch.arange(-wlen/2,wlen/2+1, device=device)
 
         if h==1:
             zidx = [0]
@@ -122,11 +120,12 @@ class BuildK(nn.Module):
             zidx = widx
             nN = w*w*w
 
-        Z,Y,X = torch.meshgrid(torch.arange(0,h), torch.arange(0,n), torch.arange(0,m), indexing='ij')              
-        N = torch.zeros((n*m*h, nN), dtype=torch.int)
+        Z,Y,X = torch.meshgrid(torch.arange(0,h, device=device), torch.arange(0,n, device=device), torch.arange(0,m, device=device), indexing='ij')              
+        N = torch.zeros((n*m*h, nN), dtype=torch.int, device=device)
         dz, dy, dx = self.spacing
-        distances = torch.zeros(N.shape)
+        distances = torch.zeros(N.shape, device=device)
         l = 0
+        
         for z in zidx:
             Znew = self.setBoundary(Z + z,h)
             for y in yidx:
@@ -152,11 +151,12 @@ class BuildK(nn.Module):
         for the differences and a matrix for thheir relative indeces
         """
 
-
         ID,nN,distances = self.extract_neighbour_indices(input.shape,w)
-        # input= input.detach().cpu()
-        ID=ID.to(device)
+
+        device = input.device
+        ID = ID.to(device)
         distances = distances.to(device)
+
 
         sizes=input.shape
         anat_v=input.flatten()
@@ -176,8 +176,7 @@ class BuildK(nn.Module):
             # print( ID.shape)
             # Map sorted indices back to original voxel indices
             # the following is done because indices are based on the new dist tensor which lost the info that we had from ID
-            sorted_indices = ID.gather(dim=1, index=indices.type(dtype=torch.int64).to(device))
-
+            sorted_indices = ID.gather(dim=1, index=indices.type(dtype=torch.int64))
 
             # Remap physical distances to match sorted neighbour order
             sorted_distances = distances.gather(dim=1, index=indices)
@@ -216,33 +215,10 @@ class BuildK(nn.Module):
         
         sigma_anat = torch.std(input)  # global std of anatomical image
 
-        # # print("The standard dev of the anatomical image is ",sigma_anat)
-
-        # for i in range(W.shape[2]):
-
-        #     # if W[0, 0, i, 0]==0:
-        #     #     Kw[i, :]=1
-        #     #     continue
-            
-        #     anat_diff = (W[0, 0, i, :] - W[0, 0, i, 0])/sigma_anat
-        #     anat_term = torch.square(anat_diff / (math.sqrt(2) * self.sigma_m))
-        #     dist_term = torch.square(self.knn_distances[i, :] / ( self.sigma_dm))
-
-        #     if self.isHybrid and functional_W is not None:
-        #         ref_value = W[0, 0, i, 0].clamp(min=1e-8)  # central voxel value for functional normalization
-        #         func_diff = (functional_W[0, 0, i, :] - functional_W[0, 0, i, 0]) / ref_value
-        #         func_term = torch.square(func_diff / (math.sqrt(2) * self.sigma_p))
-        #     else:
-        #         func_term = 0
-        #     Kw[i, :] = torch.exp(-(anat_term + func_term + dist_term)).clamp(min=1e-12)
-        # # Normalize rows to sum to 1 (STIR normalization)
-        # Kw /= Kw.sum(dim=1, keepdim=True)
-        # return Kw
-
         # Extract fixed neighborhood indices and distances
         ID, nN, distances = self.extract_neighbour_indices(input.shape, w)
-        ID = ID.to(device)
-        distances = distances.to(device)
+        ID = ID
+        distances = distances
 
         # Flatten anatomical and functional images
         anat_v = input.flatten()  # shape: (num_voxels,)
@@ -278,8 +254,6 @@ class BuildK(nn.Module):
         self.ID = ID.unsqueeze(0).unsqueeze(0)       # shape: (1,1,num_voxels,num_neighbors)
 
         return self.Kw
-
-
 
     def get_K_save_mem_STIR_like(self,input, w,  functional_input=None):
         self.Kw = self.get_features_STIR_like(input, w, functional_input)
@@ -336,9 +310,9 @@ class BuildK(nn.Module):
         clear_pytorch_cache()
         # check_pytorch_gpu()     
         # implementation of sparse_coo is apparently very slow in gpu so sending operation on cpu
-        idxl=idx.reshape(Kw.numel(),2)#.to(device)
+        idxl=idx.reshape(Kw.numel(),2)#
         ID=ID.reshape(Kw.shape)
-        Kwl=Kw.reshape(Kw.numel())#.to(device)
+        Kwl=Kw.reshape(Kw.numel())#
         # print('### before sparse_coo creation',idxl.device,(Kwl.device))
         # check_pytorch_gpu()
         K = torch.sparse_coo_tensor(list(zip(*idxl)), Kwl, device=device, requires_grad=False)#(ID_shape2,ID_shape2),
@@ -353,13 +327,14 @@ class BuildK(nn.Module):
     #apply kernel to image
     def kernelise_image(self,K,a):
         org_shape=a.shape
-        # K=K.to(device)
+        # K=K
         return  torch.sparse.mm(K,a.reshape(a.numel(),1)).reshape(org_shape)#torch.mv(K,a.reshape(a.numel())).reshape(org_shape)#.to(torch.float32)
     
     def kernelise_image(self, Kw, ID, a):
         """
         Apply kernel weights Kw to image a using neighbor indices ID.
         Equivalent to K * a without creating a sparse matrix.
+        Gather operation
         """
 
         # Flatten image to [num_pixels]
@@ -375,6 +350,9 @@ class BuildK(nn.Module):
         return out.reshape(a.shape)
     
     def kernelise_image_t(self, Kw, ID, b):
+        """
+        adjoint of kernelise_image: scatter operation
+        """
         # flatten
         b_flat = b.reshape(-1)
 
@@ -387,7 +365,7 @@ class BuildK(nn.Module):
 
         # scatter-add back to original indexing
         P = Kw_f.shape[0]
-        adj = torch.zeros(P, device=Kw.device)
+        adj = torch.zeros(P, device=device)
         adj.scatter_add_(0, ID_f.reshape(-1), contrib.reshape(-1))
 
         return adj.reshape(b.shape)    
@@ -402,7 +380,7 @@ class BuildK(nn.Module):
         NNa = NNa.reshape(self.Kw.shape)
         # for i in range(a.numel()):
         #     kim[i] = torch.dot(self.Kw[i,:],NNa[0,0,i,:])
-        # K=K.to(device)
+        # K=K
 
         # the following calculates  the dot product 
         # of each corresponding  row in Kw and NNa
@@ -434,7 +412,7 @@ class BuildK(nn.Module):
         # print('rvalues',flat_values.shape)
 
         # Accumulate contributions
-        output = torch.zeros_like(a_v)
+        output = torch.zeros_like(a_v, device=device)
         # basicallylly to reproduce K^T*a instead of multiplying each values of the neighbourhood for the associated Kij
         # we  multiply the voxel values in  i the indeces for the relevant weights but then scatter_add makes sure that where
         # a voxel appears as a neighbour is accumulated in the relevant index position of output
@@ -443,12 +421,24 @@ class BuildK(nn.Module):
         return output.reshape(org_shape)
     
     def deepK_forward(self, input, net_W, k,w):
-        ID,nN,distances = self.extract_neighbour_indices(input.shape,w)
-        dim1,dim2,dim3 = net_W.shape[1], net_W.shape[2], net_W.shape[3] #(C,Jx,Jy) C = channels
-        J,K = ID.shape
+        _, ID = self.get_knn(input,w,k)
+        # W = W.squeeze()
+        ID = ID.squeeze()
+
+        # (A) Feature normalization to keep scales bounded due to instability of gradients using sqrt(x) with small x
+        net_W = F.normalize(net_W, p=2, dim=1, eps=1e-6)  # (B,C,H,W) or (B,C,D,H,W)
         
-        W = net_W.contiguous().view(dim1, dim2 * dim3)
-        W = W.t()  # dim: (J=Jx*Jy, C)
+        
+        if len(net_W.shape)== 4:
+            dim1,dim2,dim3 = net_W.shape[1], net_W.shape[2], net_W.shape[3] #(C,Jx,Jy) C = channels
+            W = net_W.contiguous().view(dim1, dim2 * dim3)
+        elif len(net_W.shape)== 5:
+            dim1,dim2,dim3,dim4 = net_W.shape[1], net_W.shape[2], net_W.shape[3], net_W.shape[4] #(C,Jx,Jy,Jz) C = channels
+            W = net_W.contiguous().view(dim1, dim2 * dim3 * dim4)
+        else:
+            raise ValueError(f"Unsupported net_W shape: {net_W.shape}")
+       
+        W = W.t()  # dim: (J=Jx*Jy(*Jz), C)
 
         #  1. Gather neighbor feature vectors:
         nn_W = W[ID]      #shape: (J, K, C)
@@ -461,7 +451,7 @@ class BuildK(nn.Module):
         sq_diff = diff ** 2
 
         #  4. Mean over feature channels C, sqrt, and negate
-        D = -torch.sqrt(torch.mean(sq_diff, dim=2) ) #+ self.eps)   # shape: (J, K)
+        D = -torch.sqrt(torch.mean(sq_diff, dim=2) + 1e-8) #+ self.eps)   # shape: (J, K)
 
         # 5. Softmax across neighbors
         Kw = torch.softmax(D, dim=1)
