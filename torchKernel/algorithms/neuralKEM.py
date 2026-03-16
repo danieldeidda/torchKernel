@@ -129,7 +129,7 @@ class neuralKEM(Algorithm):
             save_km="_km"
             BK(self.anatomical_tensor,self.k,self.w)
         else:
-            K=BK(self.anatomical_tensor,self.k,self.w)
+            Kw,ID=BK(self.anatomical_tensor,self.k,self.w)
             save_km=""
         print("Kernel succesfully calculated")
 
@@ -189,13 +189,13 @@ class neuralKEM(Algorithm):
                         kgrad=BK.kernelise_image_save_mem_t(grad)#.t()
                     else:
 
-                        ksens=BK.kernelise_image(K.t(),sens)
-                        ka= BK.kernelise_image(K,alpha_masked)
+                        ksens=BK.kernelise_image_t(Kw,ID,sens)
+                        ka= BK.kernelise_image(Kw,ID,alpha_masked)
                         fka=self.fp(ka)#.to(device)
                         if (self.is_real):
                             fka = fka+self.unnorm_add_tt
                         grad=self.bp((tdivide(self.data_tensor,fka)))
-                        kgrad=BK.kernelise_image(K.t(),grad)
+                        kgrad=BK.kernelise_image_t(Kw,ID,grad)
 
                     curr_kem_i[mask] =  tdivide(alpha_masked[mask],ksens[mask])*kgrad[mask]#.to(device)
                     alpha =curr_kem_i
@@ -236,7 +236,7 @@ class neuralKEM(Algorithm):
             if self.save_mem_k:
                 l=BK.kernelise_image_save_mem(alpha)
             else:
-                l=BK.kernelise_image(K,alpha) 
+                l=BK.kernelise_image(Kw,ID,alpha) 
 
             torch.save({'model_state_dict_net': net.state_dict(),
                         'optimiser_state_dict': optimiser.state_dict(),

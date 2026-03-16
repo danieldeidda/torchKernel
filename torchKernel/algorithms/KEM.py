@@ -115,7 +115,7 @@ class KEM(Algorithm):
         if self.save_mem_k:
             BK(self.anatomical_tensor,self.k,self.w)
         else:
-            K=BK(self.anatomical_tensor,self.k,self.w)
+            Kw,ID=BK(self.anatomical_tensor,self.k,self.w)
         print("Kernel succesfully calculated")
         
         alpha=torch.ones(self.anatomical_tensor.shape).to(device)
@@ -136,7 +136,7 @@ class KEM(Algorithm):
             PoissonLoglikelihood = np.load(out_filename_pref.replace('.','_')+'_data_log.npy', allow_pickle=True).item()
             alpha = torch.load(out_filename_pref+'_alpha.torch').to(self.data_tensor.device)
             frozen_alpha = torch.load(out_filename_pref+'_frozen_alpha.torch').to(self.data_tensor.device)
-            l=BK.kernelise_image(K,alpha) 
+            l=BK.kernelise_image(Kw,ID,alpha) 
 
         for i in tqdm(range(self.e_cpoint,self.epochs+self.e_cpoint),position=0, initial=self.e_cpoint):
             for s in range(self.num_subsets):
@@ -162,13 +162,13 @@ class KEM(Algorithm):
                         kgrad=BK.kernelise_image_save_mem_t(grad)
 
                     else:
-                        ksens=BK.kernelise_image(K.t(),sens)
-                        ka= BK.kernelise_image(K,alpha_masked)
+                        ksens=BK.kernelise_image_t(Kw,ID,sens)
+                        ka= BK.kernelise_image(Kw,ID,alpha_masked)
                         fka=fs(ka).to(device)
                         if (self.is_real):
                             fka = fka+ads
                         grad=bs((tdivide(ys,fka)))
-                        kgrad=BK.kernelise_image(K.t(),grad)
+                        kgrad=BK.kernelise_image_t(Kw,ID,grad)
                     curr_kem_i[mask] =  tdivide(alpha_masked[mask],ksens[mask])*kgrad[mask].to(device)
                     alpha =curr_kem_i
                     
@@ -178,7 +178,7 @@ class KEM(Algorithm):
             if self.save_mem_k:
                 l=BK.kernelise_image_save_mem(alpha)
             else:
-                l=BK.kernelise_image(K,alpha)  
+                l=BK.kernelise_image(Kw,ID,alpha)  
             
             if (self.is_real):
                 if self.num_subsets>1:
