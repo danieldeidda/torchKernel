@@ -147,7 +147,7 @@ class OTDIP(Algorithm):
                         curr_em_i = tdivide(curr_masked,sens)*grad.to(device) 
 
                         curr_em_i=torch.nan_to_num(curr_em_i, nan=0.0, posinf=0.0, neginf=0.0) 
-            
+            net.train()
             for j in range(self.deep_iter):                
                 optimiser.zero_grad() #clear old grads 
                 # Forward  
@@ -166,9 +166,10 @@ class OTDIP(Algorithm):
                 optimiser.step() 
                     
                 data_log["loss"].append(tot_loss.item())
-                data_log['epoch'].append(len(data_log["loss"]))       
-                # with torch.no_grad():
-                #     net_out = scale*net(net_in).to(device)     
+                data_log['epoch'].append(len(data_log["loss"]))   
+                net.eval()    
+                with torch.no_grad():
+                    net_out = scale*net(net_in).to(device)     
    
             curr=net_out
 

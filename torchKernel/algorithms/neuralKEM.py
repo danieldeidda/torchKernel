@@ -207,6 +207,7 @@ class neuralKEM(Algorithm):
                     # if i==0:                    
                     scale=alpha.max()
 
+            net.train()
             for j in range(self.deep_iter): 
 
                 optimiser.zero_grad() #clear old grads 
@@ -228,8 +229,9 @@ class neuralKEM(Algorithm):
                 data_log["loss"].append(tot_loss.item())
                 data_log['epoch'].append(len(data_log["loss"]))    
 
+                net.eval()
                 with torch.no_grad():
-                    # net_out = scale*net(net_in)#.to(device)
+                    net_out = scale*net(net_in)#.to(device)
                     alpha_masked[mask]=net_out[mask] # alpha=torch.nan_to_num(net_out, nan=0.0, posinf=0.0, neginf=0.0)
                     alpha = alpha_masked 
 

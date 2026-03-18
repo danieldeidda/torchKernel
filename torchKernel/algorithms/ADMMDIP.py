@@ -170,7 +170,7 @@ class ADMMDIP(Algorithm):
                 
                 if i==0:                    
                     scale=1
-                    
+            net.train()        
             def closure():
                 optimiser.zero_grad()
 
@@ -214,8 +214,9 @@ class ADMMDIP(Algorithm):
                 data_log["loss"].append(loss.item())
                 data_log["epoch"].append(len(data_log["loss"]))
 
-                # with torch.no_grad():
-                #     net_out = scale * net(net_in)
+            net.eval()
+            with torch.no_grad():
+                net_out = scale * net(net_in)
 
                     # torch.nn.utils.clip_grad_norm_(net.parameters(), max_norm=1)
                     # optimiser.step(closure)   

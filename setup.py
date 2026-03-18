@@ -18,7 +18,11 @@ setuptools.setup(
               
     entry_points={
                   "console_scripts": [
-                                        "neuralKEM=artcertainty.algorithms.neuralKEM:main"
+                                        "neuralKEM=torchKernel.algorithms.neuralKEM:main",
+                                        "OTDIP=torchKernel.algorithms.OTDIP:main",
+                                        "ADMMDIP=torchKernel.algorithms.ADMMDIP:main",
+                                        "KEM=torchKernel.algorithms.KEM:main",
+                                        "HKEM=torchKernel.algorithms.HKEM:main"
                                      ],
                  },
     python_requires='>=3.10',
